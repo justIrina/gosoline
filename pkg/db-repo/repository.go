@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/applike/gosoline/pkg/cfg"
+	"github.com/applike/gosoline/pkg/db"
 	"github.com/applike/gosoline/pkg/mon"
 	"github.com/applike/gosoline/pkg/tracing"
 	"github.com/jinzhu/gorm"
@@ -89,7 +90,14 @@ func (r *repository) Create(ctx context.Context, value ModelBased) error {
 
 	err := r.orm.Create(value).Error
 
-	// TODO: Check for duplicate error and return a local error type instead which applications can handle themselves
+	isDuplicate := db.IsDuplicateEntryError(err)
+	if isDuplicate {
+		logger.Warnf("could not create model of type %s due to duplicate entry error: %s", modelId, err.Error())
+		return &DuplicateEntryError{
+			Err: err,
+		}
+	}
+
 	if err != nil {
 		logger.Errorf(err, "could not create model of type %v", modelId)
 		return err
@@ -125,6 +133,14 @@ func (r *repository) Update(ctx context.Context, value ModelBased) error {
 	value.SetUpdatedAt(&now)
 
 	err := r.orm.Save(value).Error
+
+	isDuplicate := db.IsDuplicateEntryError(err)
+	if isDuplicate {
+		logger.Warnf("could not update model of type %s with id %d due to duplicate entry error: %s", modelId, *value.GetId(), err.Error())
+		return &DuplicateEntryError{
+			Err: err,
+		}
+	}
 
 	if err != nil {
 		logger.Errorf(err, "could not update model of type %s with id %d", modelId, *value.GetId())
