@@ -1,6 +1,11 @@
-package db_repo
+package db
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"github.com/VividCortex/mysqlerr"
+	"github.com/go-sql-driver/mysql"
+)
 
 type DuplicateEntryError struct {
 	Err error
@@ -28,4 +33,14 @@ func (e *DuplicateEntryError) As(target interface{}) bool {
 
 func (e *DuplicateEntryError) Unwrap() error {
 	return e.Err
+}
+
+func IsDuplicateEntryError(err error) bool {
+	mysqlErr := &mysql.MySQLError{}
+
+	if errors.As(err, &mysqlErr) {
+		return mysqlErr.Number == mysqlerr.ER_DUP_ENTRY
+	}
+
+	return errors.Is(err, &DuplicateEntryError{})
 }

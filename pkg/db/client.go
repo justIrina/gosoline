@@ -195,13 +195,3 @@ func (c *ClientSqlx) execWithBackoff(query string, args ...interface{}) (res sql
 
 	return
 }
-
-func IsDuplicateEntryError(err error) bool {
-	mysqlErr := &mysql.MySQLError{}
-
-	if errors.As(err, mysqlErr) {
-		return mysqlErr.Number == mysqlerr.ER_DUP_ENTRY
-	}
-
-	return false
-}

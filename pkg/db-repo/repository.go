@@ -93,7 +93,7 @@ func (r *repository) Create(ctx context.Context, value ModelBased) error {
 	isDuplicate := db.IsDuplicateEntryError(err)
 	if isDuplicate {
 		logger.Warnf("could not create model of type %s due to duplicate entry error: %s", modelId, err.Error())
-		return &DuplicateEntryError{
+		return &db.DuplicateEntryError{
 			Err: err,
 		}
 	}
@@ -137,7 +137,7 @@ func (r *repository) Update(ctx context.Context, value ModelBased) error {
 	isDuplicate := db.IsDuplicateEntryError(err)
 	if isDuplicate {
 		logger.Warnf("could not update model of type %s with id %d due to duplicate entry error: %s", modelId, *value.GetId(), err.Error())
-		return &DuplicateEntryError{
+		return &db.DuplicateEntryError{
 			Err: err,
 		}
 	}
