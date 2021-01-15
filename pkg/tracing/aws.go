@@ -32,7 +32,7 @@ func newXrayLogger(logger mon.Logger) *xrayLogger {
 func (x xrayLogger) Log(level xraylog.LogLevel, msg fmt.Stringer) {
 	switch level {
 	case xraylog.LogLevelDebug:
-		x.logger.Debug(msg)
+		x.logger.WithChannel("xray-debug").Info("xray debug message: %s", msg.String())
 	case xraylog.LogLevelInfo:
 		x.logger.Info(msg)
 	case xraylog.LogLevelWarn:
