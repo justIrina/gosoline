@@ -43,14 +43,17 @@ type Repository interface {
 	GetModelId() string
 	GetModelName() string
 	GetMetadata() Metadata
+
+	WithTransaction(transaction Transaction) (*repository, error)
 }
 
 type repository struct {
-	logger   mon.Logger
-	tracer   tracing.Tracer
-	orm      *gorm.DB
-	clock    clockwork.Clock
-	settings Settings
+	logger      mon.Logger
+	tracer      tracing.Tracer
+	orm         *gorm.DB
+	clock       clockwork.Clock
+	settings    Settings
+	transaction Transaction
 }
 
 func New(config cfg.Config, logger mon.Logger, s Settings) (*repository, error) {
@@ -85,7 +88,17 @@ func NewWithInterfaces(logger mon.Logger, tracer tracing.Tracer, orm *gorm.DB, c
 	}
 }
 
+func (r *repository) WithTransaction(transaction Transaction) (*repository, error) {
+	r.transaction = transaction
+	return r, nil
+}
+
 func (r *repository) Create(ctx context.Context, value ModelBased) error {
+	if r.transaction != nil && r.transaction.IsInBeginState() {
+		r.createWithinTransaction(r.transaction, ctx, value)
+		return nil
+	}
+
 	modelId := r.GetModelId()
 	logger := r.logger.WithContext(ctx)
 
@@ -137,6 +150,11 @@ func (r *repository) Read(ctx context.Context, id *uint, out ModelBased) error {
 }
 
 func (r *repository) Update(ctx context.Context, value ModelBased) error {
+	if r.transaction != nil && r.transaction.IsInBeginState() {
+		r.updateWithinTransaction(r.transaction, ctx, value)
+		return nil
+	}
+
 	modelId := r.GetModelId()
 	logger := r.logger.WithContext(ctx)
 
@@ -173,6 +191,11 @@ func (r *repository) Update(ctx context.Context, value ModelBased) error {
 }
 
 func (r *repository) Delete(ctx context.Context, value ModelBased) error {
+	if r.transaction != nil && r.transaction.IsInBeginState() {
+		r.deleteWithinTransaction(r.transaction, ctx, value)
+		return nil
+	}
+
 	modelId := r.GetModelId()
 	logger := r.logger.WithContext(ctx)
 
@@ -406,4 +429,20 @@ func getModel(value interface{}) (TimestampAware, bool) {
 	}
 
 	return nil, false
+}
+
+// todo squash to one executeWithinTransaction
+func (r *repository) createWithinTransaction(transaction Transaction, ctx context.Context, value ModelBased) {
+	repoWithTransaction := NewWithInterfaces(r.logger, r.tracer, transaction.GetDBConnection(), r.clock, r.settings)
+	transaction.AddAction(repoWithTransaction.Create, ctx, value)
+}
+
+func (r *repository) updateWithinTransaction(transaction Transaction, ctx context.Context, value ModelBased) {
+	repoWithTransaction := NewWithInterfaces(r.logger, r.tracer, transaction.GetDBConnection(), r.clock, r.settings)
+	transaction.AddAction(repoWithTransaction.Update, ctx, value)
+}
+
+func (r *repository) deleteWithinTransaction(transaction Transaction, ctx context.Context, value ModelBased) {
+	repoWithTransaction := NewWithInterfaces(r.logger, r.tracer, transaction.GetDBConnection(), r.clock, r.settings)
+	transaction.AddAction(repoWithTransaction.Delete, ctx, value)
 }
